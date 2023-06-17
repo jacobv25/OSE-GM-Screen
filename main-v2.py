@@ -1,9 +1,22 @@
 import sys
 import json
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListWidget, QVBoxLayout, QWidget, QSplitter, QPushButton
+from PyQt5.QtWidgets import QLabel, QTextEdit, QHBoxLayout, QListWidgetItem
 from PyQt5.QtCore import Qt
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
+class SequenceItem(QWidget):
+    def __init__(self, sequence_text):
+        super().__init__()
+
+        self.sequence_label = QLabel(sequence_text)
+        self.reminder_edit = QTextEdit()
+        self.reminder_edit.setMaximumHeight(50)  # Set max height for the reminder box
+
+        layout = QHBoxLayout()
+        layout.addWidget(self.sequence_label)
+        layout.addWidget(self.reminder_edit)
+        self.setLayout(layout)
 class SequenceApp(QWidget):
     def __init__(self):
         super().__init__()
@@ -23,7 +36,11 @@ class SequenceApp(QWidget):
 
         self.listbox = QListWidget()
         for i, step in enumerate(self.sequence):
-            self.listbox.addItem(step)
+            item = QListWidgetItem()
+            sequence_item_widget = SequenceItem(step)
+            item.setSizeHint(sequence_item_widget.sizeHint())
+            self.listbox.addItem(item)
+            self.listbox.setItemWidget(item, sequence_item_widget)
 
         self.button = QPushButton("Next Step")
         self.button.clicked.connect(self.next_step)
