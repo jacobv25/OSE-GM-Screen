@@ -1,22 +1,56 @@
 import sys
 import json
+import random
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListWidget, QVBoxLayout, QWidget, QSplitter, QPushButton
 from PyQt5.QtWidgets import QLabel, QTextEdit, QHBoxLayout, QListWidgetItem
 from PyQt5.QtCore import Qt
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
+class InitiativeWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.button = QPushButton("Decide Initiative")
+        self.button.clicked.connect(self.decide_initiative)
+
+        self.result_label = QLabel("")
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.button)
+        layout.addWidget(self.result_label)
+        self.setLayout(layout)
+
+    def decide_initiative(self):
+        party_number = random.randint(1, 6)
+        enemy_number = random.randint(1, 6)
+
+        if party_number > enemy_number:
+            result = "PARTY"
+        elif enemy_number > party_number:
+            result = "ENEMY"
+        else:
+            result = "DRAW"
+
+        self.result_label.setText(result)
+
 class SequenceItem(QWidget):
-    def __init__(self, sequence_text):
+    def __init__(self, sequence_text, step_index):
         super().__init__()
 
         self.sequence_label = QLabel(sequence_text)
-        self.reminder_edit = QTextEdit()
-        self.reminder_edit.setMaximumHeight(50)  # Set max height for the reminder box
+
+        print(f"step_index={step_index}")
+        if step_index == 1:  # For second step (0-indexed), add InitiativeWidget
+            self.special_widget = InitiativeWidget()
+        else:
+            self.special_widget = QTextEdit()
+            self.special_widget.setMaximumHeight(50)  # Set max height for the reminder box
 
         layout = QHBoxLayout()
         layout.addWidget(self.sequence_label)
-        layout.addWidget(self.reminder_edit)
+        layout.addWidget(self.special_widget)
         self.setLayout(layout)
+
 class SequenceApp(QWidget):
     def __init__(self):
         super().__init__()
@@ -37,7 +71,7 @@ class SequenceApp(QWidget):
         self.listbox = QListWidget()
         for i, step in enumerate(self.sequence):
             item = QListWidgetItem()
-            sequence_item_widget = SequenceItem(step)
+            sequence_item_widget = SequenceItem(step, i)
             item.setSizeHint(sequence_item_widget.sizeHint())
             self.listbox.addItem(item)
             self.listbox.setItemWidget(item, sequence_item_widget)
@@ -55,6 +89,7 @@ class SequenceApp(QWidget):
     def next_step(self):
         self.index = (self.index + 1) % len(self.sequence)  # Cycling through the sequence
         self.listbox.setCurrentRow(self.index)
+
 
 class AbilitiesApp(QMainWindow):
     def __init__(self, filename):
