@@ -6,6 +6,27 @@ from PyQt5.QtWidgets import QLabel, QTextEdit, QHBoxLayout, QListWidgetItem
 from PyQt5.QtCore import Qt
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
+class RollDiceWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.button = QPushButton("Roll Dice")
+        self.button.clicked.connect(self.roll_dice)
+
+        self.result_label = QLabel("")
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.button)
+        layout.addWidget(self.result_label)
+        self.setLayout(layout)
+
+    def roll_dice(self):
+        dice_roll_1 = random.randint(1, 6)
+        dice_roll_2 = random.randint(1, 6)
+        result = dice_roll_1 + dice_roll_2
+
+        self.result_label.setText(str(result))
+
 class InitiativeWidget(QWidget):
     def __init__(self):
         super().__init__()
@@ -42,9 +63,12 @@ class SequenceItem(QWidget):
         print(f"step_index={step_index}")
         if step_index == 1:  # For second step (0-indexed), add InitiativeWidget
             self.special_widget = InitiativeWidget()
+        elif step_index == 3:  # For fourth step (0-indexed), add RollDiceWidget
+            self.special_widget = RollDiceWidget()
         else:
             self.special_widget = QTextEdit()
             self.special_widget.setMaximumHeight(50)  # Set max height for the reminder box
+
 
         layout = QHBoxLayout()
         layout.addWidget(self.sequence_label)
@@ -59,7 +83,7 @@ class SequenceApp(QWidget):
             '1. Declare spells and melee movement',
             '2. Initiative: Each side rolls 1d6.',
             '3. Winning side acts:',
-            '  a. Monster morale',
+            '  a. Monster morale (low means monster keeps attacking!)',
             '  b. Movement',
             '  c. Missile attacks',
             '  d. Spell casting',
