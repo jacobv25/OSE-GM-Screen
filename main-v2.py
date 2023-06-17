@@ -55,24 +55,13 @@ class InitiativeWidget(QWidget):
         self.result_label.setText(result)
 
 class SequenceItem(QWidget):
-    def __init__(self, sequence_text, step_index):
+    def __init__(self, sequence_text):
         super().__init__()
 
         self.sequence_label = QLabel(sequence_text)
 
-        print(f"step_index={step_index}")
-        if step_index == 1:  # For second step (0-indexed), add InitiativeWidget
-            self.special_widget = InitiativeWidget()
-        elif step_index == 3:  # For fourth step (0-indexed), add RollDiceWidget
-            self.special_widget = RollDiceWidget()
-        else:
-            self.special_widget = QTextEdit()
-            self.special_widget.setMaximumHeight(50)  # Set max height for the reminder box
-
-
         layout = QHBoxLayout()
         layout.addWidget(self.sequence_label)
-        layout.addWidget(self.special_widget)
         self.setLayout(layout)
 
 class SequenceApp(QWidget):
@@ -83,7 +72,7 @@ class SequenceApp(QWidget):
             '1. Declare spells and melee movement',
             '2. Initiative: Each side rolls 1d6.',
             '3. Winning side acts:',
-            '  a. Monster morale (low means monster keeps attacking!)',
+            '  a. Monster morale',
             '  b. Movement',
             '  c. Missile attacks',
             '  d. Spell casting',
@@ -95,16 +84,23 @@ class SequenceApp(QWidget):
         self.listbox = QListWidget()
         for i, step in enumerate(self.sequence):
             item = QListWidgetItem()
-            sequence_item_widget = SequenceItem(step, i)
+            sequence_item_widget = SequenceItem(step)
             item.setSizeHint(sequence_item_widget.sizeHint())
             self.listbox.addItem(item)
             self.listbox.setItemWidget(item, sequence_item_widget)
 
+        self.listbox.currentRowChanged.connect(self.change_widget)
+
         self.button = QPushButton("Next Step")
         self.button.clicked.connect(self.next_step)
 
+        self.widget_holder = QWidget()
+        self.widget_layout = QVBoxLayout()
+        self.widget_holder.setLayout(self.widget_layout)
+
         layout = QVBoxLayout()
-        layout.addWidget(self.listbox)
+        layout.addWidget(self.listbox, 1)
+        layout.addWidget(self.widget_holder, 1)
         layout.addWidget(self.button)
         self.setLayout(layout)
 
@@ -113,6 +109,16 @@ class SequenceApp(QWidget):
     def next_step(self):
         self.index = (self.index + 1) % len(self.sequence)  # Cycling through the sequence
         self.listbox.setCurrentRow(self.index)
+
+    def change_widget(self):
+        # remove the old widgets
+        for i in reversed(range(self.widget_layout.count())): 
+            self.widget_layout.itemAt(i).widget().setParent(None)
+
+        if self.listbox.currentRow() == 1:
+            self.widget_layout.addWidget(InitiativeWidget())
+        elif self.listbox.currentRow() == 2:
+            self.widget_layout.addWidget(RollDiceWidget())
 
 
 class AbilitiesApp(QMainWindow):
