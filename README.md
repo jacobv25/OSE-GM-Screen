@@ -1,5 +1,3 @@
-Dungeons and Dragons Virtual Game Master Screen body { font-family: Arial, sans-serif; }
-
 Dungeons and Dragons Virtual Game Master Screen
 ===============================================
 
