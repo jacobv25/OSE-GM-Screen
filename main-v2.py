@@ -2,7 +2,7 @@ import sys
 import json
 import random
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListWidget, QVBoxLayout, QWidget, QSplitter, QPushButton
-from PyQt5.QtWidgets import QLabel, QHBoxLayout, QListWidgetItem, QLineEdit
+from PyQt5.QtWidgets import QLabel, QHBoxLayout, QListWidgetItem, QLineEdit, QTextEdit
 import subprocess
 from PyQt5.QtCore import QUrl, QEventLoop
 from PyQt5.QtCore import Qt
@@ -218,7 +218,7 @@ class SequenceApp(QWidget):
         elif self.listbox.currentRow() == 3:
             self.widget_layout.addWidget(MoraleCheckWidget())
 
-class AbilitiesApp(QWidget):  # change to QWidget
+class AbilitiesApp(QWidget):  
     def __init__(self, filename):
         super().__init__()
 
@@ -243,6 +243,76 @@ class AbilitiesApp(QWidget):  # change to QWidget
         self.layout = QVBoxLayout()
         self.layout.addWidget(splitter)
         self.setLayout(self.layout)  # set the layout
+
+class ConsoleTerminal(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        # Create the QTextEdit widget for command history and output
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+
+        # Create the QLineEdit widget for command input
+        self.line_edit = QLineEdit()
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.text_edit)
+        layout.addWidget(self.line_edit)
+
+        self.setLayout(layout)
+
+        # Define commands
+        self.commands = {
+            "roll": self.roll_dice,
+            "clear": self.clear_console
+        }
+
+        # Connect the returnPressed signal to the execute_command function
+        self.line_edit.returnPressed.connect(self.execute_command)
+
+    def roll_dice(self, dice):
+        try:
+            _, sides = dice.split('d')
+            sides = int(sides)
+            result = random.randint(1, sides)
+            self.text_edit.append(f"You rolled a {result} on a {dice}.")
+        except ValueError:
+            self.text_edit.append(f"Invalid dice format: {dice}. Please use 'dx' format, where x is the number of sides.")
+    
+    def clear_console(self):
+        self.text_edit.clear()
+
+    def execute_command(self):
+        # Get the command text from the line_edit widget
+        text = self.line_edit.text()
+
+        # Clear the line_edit widget
+        self.line_edit.clear()
+
+        # Split the command into a list of words
+        words = text.split()
+
+        if len(words) == 0:
+            # No command was entered
+            return
+
+        # The command is the first word
+        command = words[0]
+
+        # The rest of the words are the arguments
+        args = words[1:]
+
+        if command not in self.commands:
+            # Unknown command
+            self.text_edit.append(f"Unknown command: {command}")
+            return
+
+        try:
+            # Try to execute the command
+            self.commands[command](*args)
+        except Exception as e:
+            # If something went wrong, display the error to the user
+            self.text_edit.append(str(e))
 
 class CoreApp(QMainWindow):
     def __init__(self, *widgets):
@@ -295,9 +365,10 @@ if __name__ == "__main__":
     # Initialize each of your application components here
     sequence_app = SequenceApp()
     canvas_app = Canvas()
+    console_terminal = ConsoleTerminal()
     
     # Create the CoreApp with your components
-    core_app = CoreApp(sequence_app)
+    core_app = CoreApp(sequence_app, console_terminal)
     core_app.show()
 
     sys.exit(app.exec_())
