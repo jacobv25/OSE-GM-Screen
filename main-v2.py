@@ -2,9 +2,55 @@ import sys
 import json
 import random
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListWidget, QVBoxLayout, QWidget, QSplitter, QPushButton
-from PyQt5.QtWidgets import QLabel, QTextEdit, QHBoxLayout, QListWidgetItem, QLineEdit
+from PyQt5.QtWidgets import QLabel, QHBoxLayout, QListWidgetItem, QLineEdit
+import subprocess
+from PyQt5.QtCore import QUrl, QEventLoop
 from PyQt5.QtCore import Qt
 from PyQt5.QtWebEngineWidgets import QWebEngineView
+
+from PyQt5.QtGui import QPainter, QPen, QPixmap
+from PyQt5.QtCore import Qt, QPoint
+
+srd_url = 'https://oldschoolessentials.necroticgnome.com/srd/index.php/Main_Page'
+generator_url = 'https://oldschoolessentials.necroticgnome.com/generators/'
+path_to_board = "C:\\dev\\workspace\\DM Screen\\venv\\Scripts\\python.exe"
+board = "battle_map.py"
+
+class WebViewer(QWebEngineView):
+    def __init__(self, url):
+        super().__init__()
+        self.load(QUrl(url))
+
+class Canvas(QWidget):
+    def __init__(self):
+        super().__init__()
+        
+        self.drawing = False
+        self.last_point = QPoint()
+        
+        self.image = QPixmap(self.size())
+        self.image.fill(Qt.white)
+        
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.drawPixmap(self.rect(), self.image)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.drawing = True
+            self.last_point = event.pos()
+
+    def mouseMoveEvent(self, event):
+        if (event.buttons() & Qt.LeftButton) & self.drawing:
+            painter = QPainter(self.image)
+            painter.setPen(QPen(Qt.black, 3, Qt.SolidLine))
+            painter.drawLine(self.last_point, event.pos())
+            self.last_point = event.pos()
+            self.update()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.drawing = False
 
 class DiceRollerWidget(QWidget):
     def __init__(self):
@@ -172,28 +218,12 @@ class SequenceApp(QWidget):
         elif self.listbox.currentRow() == 3:
             self.widget_layout.addWidget(MoraleCheckWidget())
 
-class AbilitiesApp(QMainWindow):
+class AbilitiesApp(QWidget):  # change to QWidget
     def __init__(self, filename):
         super().__init__()
 
         self.abilities = self.read_abilities(filename)
         self.initUI()
-
-        # Adding DiceRollerWidget
-        self.dice_roller = DiceRollerWidget()
-        self.dice_roller.hide()  # Hide it initially
-
-        # We are adding DiceRollerApp to the QVBoxLayout
-        self.layout.addWidget(self.dice_roller)
-    
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_D and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.ShiftModifier:
-            if self.dice_roller.isVisible():
-                self.dice_roller.hide()
-            else:
-                self.dice_roller.show()
-                self.dice_roller.textbox.setFocus()  # Set focus to the text box
-        super().keyPressEvent(event)  # Call the original keyPressEvent
 
     def initUI(self):
         self.listbox = QListWidget()
@@ -209,37 +239,65 @@ class AbilitiesApp(QMainWindow):
         splitter.addWidget(self.listbox)
         splitter.addWidget(self.html_display)
 
-        # Here is the QVBoxLayout
+        # QVBoxLayout for AbilitiesApp
         self.layout = QVBoxLayout()
         self.layout.addWidget(splitter)
+        self.setLayout(self.layout)  # set the layout
+
+class CoreApp(QMainWindow):
+    def __init__(self, *widgets):
+        super().__init__()
+        self.widgets = widgets
+        self.dice_roller = DiceRollerWidget()
+        self.dice_roller.hide()
+        self.web_viewer = WebViewer(srd_url)
+        self.initUI(*widgets, self.dice_roller, self.web_viewer)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_B and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.ShiftModifier:
+            subprocess.Popen([path_to_board, board])
+            
+        if event.key() == Qt.Key_G and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.ShiftModifier:
+            url = QUrl(generator_url)
+            self.web_viewer.load(url)
+            
+        if event.key() == Qt.Key_S and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.ShiftModifier:
+            url = QUrl(srd_url)
+            self.web_viewer.load(url)
+        
+        if event.key() == Qt.Key_D and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.ShiftModifier:
+            if self.dice_roller.isVisible():
+                self.dice_roller.hide()
+            else:
+                self.dice_roller.show()
+                self.dice_roller.textbox.setFocus()  # Set focus to the text box
+        super().keyPressEvent(event)  # Call the original keyPressEvent
+
+    def initUI(self, *widgets):
+        splitter = QSplitter(Qt.Horizontal)
+
+        # Add each widget to the splitter
+        for widget in widgets:
+            splitter.addWidget(widget)
+
+        layout = QVBoxLayout()
+        layout.addWidget(splitter)
 
         centralWidget = QWidget()
-        centralWidget.setLayout(self.layout)
+        centralWidget.setLayout(layout)
         self.setCentralWidget(centralWidget)
 
-    def init_html_display(self):
-        self.html_display = QWebEngineView()
-        self.html_display.setHtml('')
-
-    def read_abilities(self, filename):
-        with open(filename, 'r', encoding='utf-8') as f:
-            abilities = [json.loads(line) for line in f]
-        return abilities
-
-    def display_ability(self):
-        selected_items = self.listbox.selectedItems()
-        if selected_items:
-            selected_ability_name = selected_items[0].text()
-            selected_ability = next((ability for ability in self.abilities if ability['name'] == selected_ability_name), None)
-            if selected_ability:
-                description = selected_ability['data']['description']
-                print('debug description:', description)
-                self.html_display.setHtml(description)
 
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
-    abilities_app = AbilitiesApp("abilities-cleric.db")
-    # abilities_app = SequenceApp()
-    abilities_app.show()
+
+    # Initialize each of your application components here
+    sequence_app = SequenceApp()
+    canvas_app = Canvas()
+    
+    # Create the CoreApp with your components
+    core_app = CoreApp(sequence_app)
+    core_app.show()
+
     sys.exit(app.exec_())
