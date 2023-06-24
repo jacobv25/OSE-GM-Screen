@@ -2,7 +2,7 @@ import sys
 import json
 import random
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListWidget, QVBoxLayout, QWidget, QSplitter, QPushButton
-from PyQt5.QtWidgets import QLabel, QHBoxLayout, QListWidgetItem, QLineEdit, QTextEdit
+from PyQt5.QtWidgets import QLabel, QHBoxLayout, QListWidgetItem, QLineEdit, QTextEdit, QCompleter
 import subprocess
 from PyQt5.QtCore import QUrl, QEventLoop
 from PyQt5.QtCore import Qt
@@ -20,6 +20,16 @@ class WebViewer(QWebEngineView):
     def __init__(self, url):
         super().__init__()
         self.load(QUrl(url))
+
+    def search(self, query):
+        js_fill = f"document.getElementById('searchInput').value = '{query}';"
+        js_click = "document.getElementById('searchGoButton').click();"
+        
+        # Fill the search bar
+        self.page().runJavaScript(js_fill)
+        
+        # Click the search button
+        self.page().runJavaScript(js_click)
 
 class Canvas(QWidget):
     def __init__(self):
@@ -245,7 +255,7 @@ class AbilitiesApp(QWidget):
         self.setLayout(self.layout)  # set the layout
 
 class ConsoleTerminal(QWidget):
-    def __init__(self):
+    def __init__(self, web_viewer):
         super().__init__()
 
         # Create the QTextEdit widget for command history and output
@@ -261,11 +271,23 @@ class ConsoleTerminal(QWidget):
 
         self.setLayout(layout)
 
+        # Web viewer reference
+        self.web_viewer = web_viewer
+
         # Define commands
         self.commands = {
             "roll": self.roll_dice,
-            "clear": self.clear_console
+            "clear": self.clear_console,
+            "search": self.search_web
         }
+
+        # Initialize command history and history position
+        self.command_history = []
+        self.history_pos = 0
+
+        # Add autocompletion
+        self.completer = QCompleter(list(self.commands.keys()))
+        self.line_edit.setCompleter(self.completer)
 
         # Connect the returnPressed signal to the execute_command function
         self.line_edit.returnPressed.connect(self.execute_command)
@@ -282,12 +304,19 @@ class ConsoleTerminal(QWidget):
     def clear_console(self):
         self.text_edit.clear()
 
+    def search_web(self, query):
+        self.web_viewer.search(''.join(query))
+
     def execute_command(self):
         # Get the command text from the line_edit widget
         text = self.line_edit.text()
 
         # Clear the line_edit widget
         self.line_edit.clear()
+
+        # Add command to history and reset history position
+        self.command_history.append(text)
+        self.history_pos = len(self.command_history)
 
         # Split the command into a list of words
         words = text.split()
@@ -314,6 +343,22 @@ class ConsoleTerminal(QWidget):
             # If something went wrong, display the error to the user
             self.text_edit.append(str(e))
 
+    def keyPressEvent(self, event):
+        # If up or down key is pressed, navigate through command history
+        if event.key() == Qt.Key_Up:
+            if self.history_pos > 0:
+                self.history_pos -= 1
+                self.line_edit.setText(self.command_history[self.history_pos])
+        elif event.key() == Qt.Key_Down:
+            if self.history_pos < len(self.command_history) - 1:
+                self.history_pos += 1
+                self.line_edit.setText(self.command_history[self.history_pos])
+            elif self.history_pos == len(self.command_history) - 1:
+                self.history_pos += 1
+                self.line_edit.clear()
+        else:
+            super(ConsoleTerminal, self).keyPressEvent(event)
+
 class CoreApp(QMainWindow):
     def __init__(self, *widgets):
         super().__init__()
@@ -321,7 +366,8 @@ class CoreApp(QMainWindow):
         self.dice_roller = DiceRollerWidget()
         self.dice_roller.hide()
         self.web_viewer = WebViewer(srd_url)
-        self.initUI(*widgets, self.dice_roller, self.web_viewer)
+        self.console_terminal = ConsoleTerminal(self.web_viewer)
+        self.initUI(*widgets, self.dice_roller, self.web_viewer, self.console_terminal)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_B and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.ShiftModifier:
@@ -357,7 +403,6 @@ class CoreApp(QMainWindow):
         centralWidget.setLayout(layout)
         self.setCentralWidget(centralWidget)
 
-
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
@@ -365,10 +410,9 @@ if __name__ == "__main__":
     # Initialize each of your application components here
     sequence_app = SequenceApp()
     canvas_app = Canvas()
-    console_terminal = ConsoleTerminal()
     
     # Create the CoreApp with your components
-    core_app = CoreApp(sequence_app, console_terminal)
+    core_app = CoreApp()
     core_app.show()
 
     sys.exit(app.exec_())
