@@ -4,7 +4,7 @@ import random
 from PyQt5.QtWidgets import QApplication, QMainWindow, QListWidget, QVBoxLayout, QWidget, QSplitter, QPushButton
 from PyQt5.QtWidgets import QLabel, QHBoxLayout, QListWidgetItem, QLineEdit, QTextEdit, QCompleter
 import subprocess
-from PyQt5.QtCore import QUrl, QEventLoop
+from PyQt5.QtCore import QUrl
 from PyQt5.QtCore import Qt
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
@@ -278,7 +278,9 @@ class ConsoleTerminal(QWidget):
         self.commands = {
             "roll": self.roll_dice,
             "clear": self.clear_console,
-            "search": self.search_web
+            "search": self.search_web,
+            "show": self.show_module,            
+            "hide": self.hide_module            
         }
 
         # Initialize command history and history position
@@ -292,20 +294,6 @@ class ConsoleTerminal(QWidget):
         # Connect the returnPressed signal to the execute_command function
         self.line_edit.returnPressed.connect(self.execute_command)
 
-    def roll_dice(self, dice):
-        try:
-            _, sides = dice.split('d')
-            sides = int(sides)
-            result = random.randint(1, sides)
-            self.text_edit.append(f"You rolled a {result} on a {dice}.")
-        except ValueError:
-            self.text_edit.append(f"Invalid dice format: {dice}. Please use 'dx' format, where x is the number of sides.")
-    
-    def clear_console(self):
-        self.text_edit.clear()
-
-    def search_web(self, query):
-        self.web_viewer.search(''.join(query))
 
     def execute_command(self):
         # Get the command text from the line_edit widget
@@ -359,17 +347,79 @@ class ConsoleTerminal(QWidget):
         else:
             super(ConsoleTerminal, self).keyPressEvent(event)
 
+    def roll_dice(self, dice):
+        try:
+            _, sides = dice.split('d')
+            sides = int(sides)
+            result = random.randint(1, sides)
+            self.text_edit.append(f"You rolled a {result} on a {dice}.")
+        except ValueError:
+            self.text_edit.append(f"Invalid dice format: {dice}. Please use 'dx' format, where x is the number of sides.")
+    
+    def clear_console(self):
+        self.text_edit.clear()
+
+    def search_web(self, query):
+        self.web_viewer.search(''.join(query))
+
+    def show_module(self, module_name):
+        # Get the module object from the module dictionary passed by the CoreApp
+        module = self.module_dict.get(module_name)
+
+        if module is not None:
+            # If the module is hidden, show it
+            if not module.isVisible():
+                module.show()
+                self.text_edit.append(f"{module_name} module is now visible.")
+        else:
+            self.text_edit.append(f"Unknown module: {module_name}")
+
+    def hide_module(self, module_name):
+        # Get the module object from the module dictionary passed by the CoreApp
+        module = self.module_dict.get(module_name)
+
+        if module is not None:
+            # If the module is visible, hide it
+            if module.isVisible():
+                module.hide()
+                self.text_edit.append(f"{module_name} module is now hidden.")
+        else:
+            self.text_edit.append(f"Unknown module: {module_name}")
+
 class CoreApp(QMainWindow):
     def __init__(self, *widgets):
         super().__init__()
         self.widgets = widgets
         self.dice_roller = DiceRollerWidget()
         self.dice_roller.hide()
-        self.web_viewer = WebViewer(srd_url)
-        self.console_terminal = ConsoleTerminal(self.web_viewer)
-        self.initUI(*widgets, self.dice_roller, self.web_viewer, self.console_terminal)
+        
+        # check if web_viewer is the first widget
+        if not isinstance(widgets[0], WebViewer):
+            #throw exception
+            raise Exception("WebViewer must be the first widget")
+        # check if console_terminal is the last widget
+        if not isinstance(widgets[-1], ConsoleTerminal):
+            # throw exception
+            raise Exception("ConsoleTerminal must be the last widget")
+        
+        self.web_viewer = widgets[0]
+        self.console_terminal = widgets[-1]
+        self.console_textbox = widgets[-1].line_edit
+        self.initUI(*widgets, self.dice_roller)
+        
+        # Create the module dictionary and pass it to the console terminal
+        self.module_dict = {
+            "dice_roller": self.dice_roller,
+            "web_viewer": self.web_viewer,
+            # add more modules here
+        }
+        self.console_terminal.module_dict = self.module_dict
 
     def keyPressEvent(self, event):
+        
+        if event.key() == Qt.Key_T and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.AltModifier:
+            self.console_textbox.setFocus()
+        
         if event.key() == Qt.Key_B and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.ShiftModifier:
             subprocess.Popen([path_to_board, board])
             
@@ -387,6 +437,7 @@ class CoreApp(QMainWindow):
             else:
                 self.dice_roller.show()
                 self.dice_roller.textbox.setFocus()  # Set focus to the text box
+        
         super().keyPressEvent(event)  # Call the original keyPressEvent
 
     def initUI(self, *widgets):
@@ -411,8 +462,11 @@ if __name__ == "__main__":
     sequence_app = SequenceApp()
     canvas_app = Canvas()
     
-    # Create the CoreApp with your components
-    core_app = CoreApp()
+    web_viewer = WebViewer(srd_url)
+    console_terminal = ConsoleTerminal(web_viewer)
+    
+    # console_terminal must be last in the list of widgets
+    core_app = CoreApp(web_viewer, console_terminal)
     core_app.show()
 
     sys.exit(app.exec_())
