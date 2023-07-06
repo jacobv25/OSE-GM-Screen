@@ -280,7 +280,20 @@ class ConsoleTerminal(QWidget):
             "clear": self.clear_console,
             "search": self.search_web,
             "show": self.show_module,            
-            "hide": self.hide_module            
+            "hide": self.hide_module,
+            "list-modules": self.list_modules,
+            "--help": self.print_help            
+        }
+        
+        # Define help text for each command
+        self.help_text = {
+            "roll": "roll: Rolls a dice. Usage: roll <dice sides>",
+            "clear": "clear: Clears the console. Usage: clear",
+            "search": "search: Searches the web. Usage: search <query>",
+            "show": "show: Shows a module. Usage: show <module name>",
+            "hide": "hide: Hides a module. Usage: hide <module name>",
+            "list-modules": "list-modules: Lists all modules. Usage: list-modules",
+            "--help": "--help: Shows this help text. Usage: --help [<command>]"
         }
 
         # Initialize command history and history position
@@ -293,8 +306,7 @@ class ConsoleTerminal(QWidget):
 
         # Connect the returnPressed signal to the execute_command function
         self.line_edit.returnPressed.connect(self.execute_command)
-
-
+    
     def execute_command(self):
         # Get the command text from the line_edit widget
         text = self.line_edit.text()
@@ -319,18 +331,19 @@ class ConsoleTerminal(QWidget):
         # The rest of the words are the arguments
         args = words[1:]
 
-        if command not in self.commands:
-            # Unknown command
-            self.text_edit.append(f"Unknown command: {command}")
-            return
-
-        try:
-            # Try to execute the command
+        if command in self.commands:
+            # Call the function associated with the command, passing the arguments
             self.commands[command](*args)
-        except Exception as e:
-            # If something went wrong, display the error to the user
-            self.text_edit.append(str(e))
-
+        else:
+            self.text_edit.append(f'Unknown command: {command}')
+             
+    def print_help(self, *args):
+        if args and args[0] in self.help_text:
+            self.text_edit.append(self.help_text[args[0]])
+        else:
+            for command, help_text in self.help_text.items():
+                self.text_edit.append(help_text)
+                
     def keyPressEvent(self, event):
         # If up or down key is pressed, navigate through command history
         if event.key() == Qt.Key_Up:
@@ -347,74 +360,86 @@ class ConsoleTerminal(QWidget):
         else:
             super(ConsoleTerminal, self).keyPressEvent(event)
 
-    def roll_dice(self, dice):
+    def roll_dice(self, *args):
         try:
+            dice = args[0]
             _, sides = dice.split('d')
             sides = int(sides)
             result = random.randint(1, sides)
             self.text_edit.append(f"You rolled a {result} on a {dice}.")
-        except ValueError:
-            self.text_edit.append(f"Invalid dice format: {dice}. Please use 'dx' format, where x is the number of sides.")
-    
-    def clear_console(self):
+        except (ValueError, IndexError):
+            self.text_edit.append("Invalid dice format or argument. Please use 'dx' format, where x is the number of sides.")
+
+    def clear_console(self, *args):
         self.text_edit.clear()
 
-    def search_web(self, query):
-        self.web_viewer.search(''.join(query))
+    def search_web(self, *args):
+        try:
+            query = args[0]
+            self.web_viewer.search(''.join(query))
+        except IndexError:
+            self.text_edit.append("Missing search query.")
 
-    def show_module(self, module_name):
-        # Get the module object from the module dictionary passed by the CoreApp
-        module = self.module_dict.get(module_name)
+    def show_module(self, *args):
+        try:
+            module_name = args[0]
+            # Get the module object from the module dictionary passed by the CoreApp
+            module = self.module_dict.get(module_name)
 
-        if module is not None:
-            # If the module is hidden, show it
-            if not module.isVisible():
-                module.show()
-                self.text_edit.append(f"{module_name} module is now visible.")
-        else:
-            self.text_edit.append(f"Unknown module: {module_name}")
+            if module is not None:
+                # If the module is hidden, show it
+                if not module.isVisible():
+                    module.show()
+                    self.text_edit.append(f"{module_name} module is now visible.")
+            else:
+                self.text_edit.append(f"Unknown module: {module_name}")
+        except IndexError:
+            self.text_edit.append("Missing module name.")
 
-    def hide_module(self, module_name):
-        # Get the module object from the module dictionary passed by the CoreApp
-        module = self.module_dict.get(module_name)
+    def hide_module(self, *args):
+        try:
+            module_name = args[0]
+            # Get the module object from the module dictionary passed by the CoreApp
+            module = self.module_dict.get(module_name)
 
-        if module is not None:
-            # If the module is visible, hide it
-            if module.isVisible():
-                module.hide()
-                self.text_edit.append(f"{module_name} module is now hidden.")
-        else:
-            self.text_edit.append(f"Unknown module: {module_name}")
+            if module is not None:
+                # If the module is visible, hide it
+                if module.isVisible():
+                    module.hide()
+                    self.text_edit.append(f"{module_name} module is now hidden.")
+            else:
+                self.text_edit.append(f"Unknown module: {module_name}")
+        except IndexError:
+            self.text_edit.append("Missing module name.")
+
+    def list_modules(self, *args):
+        module_names = list(self.module_dict.keys())
+        module_names.sort()  # Optional: sort the module names
+        self.text_edit.append("Modules:")
+        for name in module_names:
+            self.text_edit.append(name)
 
 class CoreApp(QMainWindow):
-    def __init__(self, *widgets):
+    def __init__(self, **widgets):
         super().__init__()
         self.widgets = widgets
-        self.dice_roller = DiceRollerWidget()
-        self.dice_roller.hide()
-        
-        # check if web_viewer is the first widget
-        if not isinstance(widgets[0], WebViewer):
-            #throw exception
-            raise Exception("WebViewer must be the first widget")
-        # check if console_terminal is the last widget
-        if not isinstance(widgets[-1], ConsoleTerminal):
-            # throw exception
-            raise Exception("ConsoleTerminal must be the last widget")
-        
-        self.web_viewer = widgets[0]
-        self.console_terminal = widgets[-1]
-        self.console_textbox = widgets[-1].line_edit
-        self.initUI(*widgets, self.dice_roller)
+        # We can access each widget directly now
+        self.web_viewer = widgets.get("web_viewer")
+        self.console_terminal = widgets.get("console_terminal")
+        self.console_textbox = widgets.get("console_terminal").line_edit
+
+        # Initialize UI
+        self.initUI()
         
         # Create the module dictionary and pass it to the console terminal
-        self.module_dict = {
-            "dice_roller": self.dice_roller,
-            "web_viewer": self.web_viewer,
-            # add more modules here
-        }
+        self.module_dict = widgets  # Our widgets dictionary is already a module dictionary
         self.console_terminal.module_dict = self.module_dict
-
+        
+        # Hide all widgets except for console_terminal
+        for name, widget in self.widgets.items():
+            if name != 'console_terminal':
+                widget.hide()
+                
     def keyPressEvent(self, event):
         
         if event.key() == Qt.Key_T and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.AltModifier:
@@ -444,7 +469,7 @@ class CoreApp(QMainWindow):
         splitter = QSplitter(Qt.Horizontal)
 
         # Add each widget to the splitter
-        for widget in widgets:
+        for widget in self.widgets.values():
             splitter.addWidget(widget)
 
         layout = QVBoxLayout()
@@ -461,12 +486,11 @@ if __name__ == "__main__":
     # Initialize each of your application components here
     sequence_app = SequenceApp()
     canvas_app = Canvas()
-    
     web_viewer = WebViewer(srd_url)
     console_terminal = ConsoleTerminal(web_viewer)
-    
-    # console_terminal must be last in the list of widgets
-    core_app = CoreApp(web_viewer, console_terminal)
+
+    # You can provide your widgets in any order, just remember to name them correctly
+    core_app = CoreApp(web_viewer=web_viewer, sequence_app=sequence_app, canvas_app=canvas_app, console_terminal=console_terminal)
     core_app.show()
 
     sys.exit(app.exec_())
