@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt, QPoint
 
 srd_url = 'https://oldschoolessentials.necroticgnome.com/srd/index.php/Main_Page'
 generator_url = 'https://oldschoolessentials.necroticgnome.com/generators/'
-path_to_board = "C:\\dev\\workspace\\DM Screen\\venv\\Scripts\\python.exe"
+path_to_board = "C:\\dev\\workspace\\OSE-GM-Screen\\venv\\Scripts\\python.exe"
 board = "battle_map.py"
 
 class WebViewer(QWebEngineView):
@@ -448,7 +448,8 @@ class CoreApp(QMainWindow):
         # We can access each widget directly now
         self.web_viewer = widgets.get("web_viewer")
         self.console_terminal = widgets.get("console_terminal")
-        self.console_textbox = widgets.get("console_terminal").line_edit
+        self.console_inputTextBox = widgets.get("console_terminal").line_edit
+        self.console_outputTextBox = widgets.get("console_terminal").text_edit
 
         # Initialize UI
         self.initUI()
@@ -465,7 +466,7 @@ class CoreApp(QMainWindow):
     def keyPressEvent(self, event):
         
         if event.key() == Qt.Key_T and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.AltModifier:
-            self.console_textbox.setFocus()
+            self.console_inputTextBox.setFocus()
         
         if event.key() == Qt.Key_B and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.ShiftModifier:
             subprocess.Popen([path_to_board, board])
