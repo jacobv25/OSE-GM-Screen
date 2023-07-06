@@ -8,7 +8,7 @@ from PyQt5.QtCore import QUrl
 from PyQt5.QtCore import Qt
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
-from PyQt5.QtGui import QPainter, QPen, QPixmap
+from PyQt5.QtGui import QPainter, QPen, QPixmap, QFont
 from PyQt5.QtCore import Qt, QPoint
 
 srd_url = 'https://oldschoolessentials.necroticgnome.com/srd/index.php/Main_Page'
@@ -264,7 +264,15 @@ class ConsoleTerminal(QWidget):
 
         # Create the QLineEdit widget for command input
         self.line_edit = QLineEdit()
+        
+        # Define the font and its size
+        font = QFont()
+        font.setPointSize(14)  # Set the font size you want
 
+        # Set the font for both widgets
+        self.text_edit.setFont(font)
+        self.line_edit.setFont(font)
+        
         layout = QVBoxLayout()
         layout.addWidget(self.text_edit)
         layout.addWidget(self.line_edit)
@@ -304,6 +312,9 @@ class ConsoleTerminal(QWidget):
         self.completer = QCompleter(list(self.commands.keys()))
         self.line_edit.setCompleter(self.completer)
 
+        # Add a ">" in front of the command line
+        self.line_edit.setText(">")
+        
         # Connect the returnPressed signal to the execute_command function
         self.line_edit.returnPressed.connect(self.execute_command)
     
@@ -311,15 +322,26 @@ class ConsoleTerminal(QWidget):
         # Get the command text from the line_edit widget
         text = self.line_edit.text()
 
-        # Clear the line_edit widget
+        # Clear the line_edit widget and add a ">"
         self.line_edit.clear()
+        self.line_edit.setText(">")
+        
+        # If the text is just ">", it means the user didn't enter any command
+        if text == ">":
+            return
+    
+        # Otherwise, remove the ">" and process the command
+        command_text = text[1:].strip()
 
-        # Add command to history and reset history position
-        self.command_history.append(text)
+        # Add command_text to history and reset history position
+        self.command_history.append(command_text)
         self.history_pos = len(self.command_history)
 
+        # Add the command text to the output area
+        self.text_edit.append(">" + command_text)
+
         # Split the command into a list of words
-        words = text.split()
+        words = command_text.split()
 
         if len(words) == 0:
             # No command was entered
