@@ -469,8 +469,10 @@ class CoreApp(QMainWindow):
             self.console_inputTextBox.setFocus()
         
         if event.key() == Qt.Key_B and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.ShiftModifier:
-            subprocess.Popen([path_to_board, board])
-            
+            try:
+                subprocess.Popen([path_to_board, board])
+            except FileNotFoundError:
+                self.console_outputTextBox.append("Board file not found.")
         if event.key() == Qt.Key_G and event.modifiers() & Qt.ControlModifier and event.modifiers() & Qt.ShiftModifier:
             url = QUrl(generator_url)
             self.web_viewer.load(url)
